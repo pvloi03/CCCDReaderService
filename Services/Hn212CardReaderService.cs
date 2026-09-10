@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.SignalR;
 using CCCDReaderService.Exceptions;
 using CCCDReaderService.Hubs;
 using CCCDReaderService.Models;
+using RAR.IdCard.Models;
+using RAR.IdCard.Sdk.Models;
 using RAR.IdCard.Sdk.Reader;
 using RAR.IdCard.Sdk.Reader.HN212;
 
@@ -39,6 +41,19 @@ public class Hn212CardReaderService : ICardReaderService
     {
         get
         {
+            try
+            {
+                var sensors = _reader.GetSensorsStatus();
+                if (sensors != null)
+                {
+                    return sensors.CardOnReader;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
             lock (_lock)
             {
                 return _hasCard;
@@ -72,11 +87,14 @@ public class Hn212CardReaderService : ICardReaderService
 
             try
             {
-                _logger.LogInformation("Khởi động giám sát đầu đọc HN-212...");
-                var config = new VnHn212Config();
+                _logger.LogInformation("Khởi động giám sát đầu đọc HN-212 theo cấu hình Hanel SDK...");
+                var config = new VnHn212Config
+                {
+                    AutoReadWhenPresent = true
+                };
                 _reader.StartMonitor(config);
                 _isMonitoring = true;
-                _logger.LogInformation("Giám sát đầu đọc HN-212 đã kích hoạt.");
+                _logger.LogInformation("Giám sát đầu đọc HN-212 đã kích hoạt thành công.");
             }
             catch (Exception ex)
             {
@@ -106,87 +124,151 @@ public class Hn212CardReaderService : ICardReaderService
         }
     }
 
+    public void PauseInternalCamera(bool doPause, int timeoutMs = 2000)
+    {
+        try
+        {
+            _reader.ReqInternalCamToPause(doPause, timeoutMs);
+            _logger.LogDebug("ReqInternalCamToPause: {Pause}, timeout: {Timeout}ms", doPause, timeoutMs);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Lỗi khi tạm dừng OCR-Camera nội bộ: {Message}", ex.Message);
+        }
+    }
+
     private void OnReaderStatusChanged(object sender, StatusEventArgs e)
     {
-        _logger.LogDebug("Reader Event: {EventName} - Serial: {Serial}", e.EventName, e.ReaderSerialNumber);
+        _logger.LogDebug("HN-212 SDK Event: {EventName} - Serial: {Serial}", e.EventName, e.ReaderSerialNumber);
 
         switch (e.EventName)
         {
             case EVENT_NAMES.READER:
-                var connected = IsDeviceConnected;
-                var statusStr = connected ? "Connected" : "Disconnected";
-                DeviceStatusChanged?.Invoke(this, statusStr);
-                _hubContext.Clients.All.DeviceStatusChanged(new
-                {
-                    @event = "DeviceStatusChanged",
-                    device = "CardReader",
-                    status = statusStr,
-                    timestamp = DateTime.Now
-                });
+                ProcessReaderEvent(e as StatusEventReaderArgs);
                 break;
 
             case EVENT_NAMES.CARD:
-            case EVENT_NAMES.SENSORS:
-                HandleCardPresenceChanged();
+                ProcessCardEvent(e as StatusEventCardArgs);
                 break;
 
             case EVENT_NAMES.READ:
-                HandleReadCompleted();
+                ProcessReadEvent(e as StatusEventReadArgs);
+                break;
+
+            case EVENT_NAMES.READER_CAMERA:
+                ProcessCameraEvent(e as StatusEventCameraArgs);
                 break;
         }
     }
 
-    private void HandleCardPresenceChanged()
+    private void ProcessReaderEvent(StatusEventReaderArgs? ev)
     {
-        bool currentPresence = false;
-        try
+        if (ev == null) return;
+
+        bool isConnected = ev.NewState == READER_STATUS.ADDED;
+        var statusStr = isConnected ? "Connected" : "Disconnected";
+        _logger.LogInformation("Đầu đọc HN-212 trạng thái: {Status}", statusStr);
+
+        DeviceStatusChanged?.Invoke(this, statusStr);
+        _hubContext.Clients.All.DeviceStatusChanged(new
         {
-            var sensors = _reader.GetSensorsStatus();
-            currentPresence = sensors != null && sensors.CardInserted(new RAR.IdCard.Sdk.Reader.HN212.Hn212SensorInfo(0));
-        }
-        catch
-        {
-            // Fallback: assume card event implies presence
-            currentPresence = !_hasCard;
-        }
+            @event = "DeviceStatusChanged",
+            device = "CardReader",
+            status = statusStr,
+            timestamp = DateTime.Now
+        });
+    }
+
+    private void ProcessCardEvent(StatusEventCardArgs? ev)
+    {
+        if (ev == null) return;
 
         lock (_lock)
         {
-            if (currentPresence != _hasCard)
+            if (ev.NewState == CARD_STATUS.PRESENT)
             {
-                _hasCard = currentPresence;
-                if (_hasCard)
+                _hasCard = true;
+                _logger.LogInformation("Thẻ CCCD được cắm vào đầu đọc (CARD_STATUS.PRESENT).");
+                CardInserted?.Invoke(this, EventArgs.Empty);
+                _hubContext.Clients.All.CardInserted(new
                 {
-                    _logger.LogInformation("Phát hiện thẻ CCCD được cắm vào đầu đọc.");
-                    CardInserted?.Invoke(this, EventArgs.Empty);
-                    _hubContext.Clients.All.CardInserted(new
-                    {
-                        @event = "CardInserted",
-                        timestamp = DateTime.Now
-                    });
-                }
-                else
+                    @event = "CardInserted",
+                    timestamp = DateTime.Now
+                });
+            }
+            else if (ev.NewState == CARD_STATUS.EMPTY)
+            {
+                _hasCard = false;
+                _logger.LogInformation("Thẻ CCCD bị rút ra khỏi đầu đọc (CARD_STATUS.EMPTY).");
+                CardRemoved?.Invoke(this, EventArgs.Empty);
+                _hubContext.Clients.All.CardRemoved(new
                 {
-                    _logger.LogInformation("Phát hiện thẻ CCCD đã được rút ra.");
-                    CardRemoved?.Invoke(this, EventArgs.Empty);
-                    _hubContext.Clients.All.CardRemoved(new
-                    {
-                        @event = "CardRemoved",
-                        timestamp = DateTime.Now
-                    });
-                }
+                    @event = "CardRemoved",
+                    timestamp = DateTime.Now
+                });
             }
         }
     }
 
-    private void HandleReadCompleted()
+    private void ProcessCameraEvent(StatusEventCameraArgs? ev)
     {
-        lock (_lock)
+        if (ev == null) return;
+
+        bool isCamConnected = ev.NewState == CAMERA_STATUS.PRESENT;
+        _logger.LogInformation("Camera đầu đọc trạng thái: {State}", ev.NewState);
+        _hubContext.Clients.All.DeviceStatusChanged(new
         {
-            if (_readTcs != null && !_readTcs.Task.IsCompleted)
+            @event = "DeviceStatusChanged",
+            device = "ReaderCamera",
+            status = isCamConnected ? "Connected" : "Disconnected",
+            timestamp = DateTime.Now
+        });
+    }
+
+    private void ProcessReadEvent(StatusEventReadArgs? ev)
+    {
+        if (ev == null) return;
+
+        _logger.LogInformation("Đang đọc thẻ - Bước: {Step}, Trạng thái: {Status}", ev.Step, ev.Status);
+
+        if (ev.Step == READ_CARD_STEPS.FINISH)
+        {
+            if (ev.Status == READ_CARD_STATUS.SUCCESS)
             {
-                var cardData = _reader.CardData;
-                _readTcs.TrySetResult(cardData);
+                var cardFullData = _reader.CardData;
+                if (cardFullData?.Dg13File != null)
+                {
+                    var citizenDto = ExtractCitizenDto(cardFullData);
+                    var session = _sessionManager.CreateSession(citizenDto);
+                    _logger.LogInformation("Đọc thẻ CCCD thành công cho số {CardNumber}, SessionId: {SessionId}", citizenDto.CardNumber, session.SessionId);
+
+                    _hubContext.Clients.All.CardReadSuccess(new
+                    {
+                        @event = "CardReadSuccess",
+                        sessionId = session.SessionId,
+                        cardData = citizenDto,
+                        timestamp = DateTime.Now
+                    });
+
+                    lock (_lock)
+                    {
+                        _readTcs?.TrySetResult(cardFullData);
+                    }
+                }
+                else
+                {
+                    lock (_lock)
+                    {
+                        _readTcs?.TrySetException(new CardReadException("Đọc thẻ thành công nhưng không có cấu trúc dữ liệu cá nhân (DG13)."));
+                    }
+                }
+            }
+            else if (ev.Status == READ_CARD_STATUS.FAILURE)
+            {
+                lock (_lock)
+                {
+                    _readTcs?.TrySetException(new CardReadException($"Đọc thẻ CCCD thất bại ở bước {ev.Step}"));
+                }
             }
         }
     }
@@ -211,10 +293,10 @@ public class Hn212CardReaderService : ICardReaderService
 
         try
         {
-            _logger.LogInformation("Bắt đầu đọc dữ liệu thẻ CCCD qua APDU...");
+            _logger.LogInformation("Bắt đầu đọc dữ liệu thẻ CCCD qua Hanel SDK (StartReadCard)...");
             _reader.StartReadCard("", true);
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             linkedCts.Token.Register(() => _readTcs.TrySetCanceled());
 
@@ -224,31 +306,8 @@ public class Hn212CardReaderService : ICardReaderService
                 throw new CardReadException("Không thể đọc hoặc giải mã cấu trúc dữ liệu chip thẻ CCCD.");
             }
 
-            var citizenDto = new CitizenCardDto
-            {
-                CardNumber = cardFullData.Dg13File.DocumentNumber ?? string.Empty,
-                FullName = cardFullData.Dg13File.Name ?? string.Empty,
-                DateOfBirth = cardFullData.Dg13File.DateOfBirth ?? string.Empty,
-                Gender = cardFullData.Dg13File.Sex ?? string.Empty,
-                Nationality = cardFullData.Dg13File.Nationality ?? "Việt Nam",
-                Hometown = cardFullData.Dg13File.Hometown ?? string.Empty,
-                PermanentAddress = cardFullData.Dg13File.Address ?? string.Empty,
-                IssueDate = cardFullData.Dg13File.IssueDate ?? string.Empty,
-                ExpiryDate = cardFullData.Dg13File.ExpiredDate ?? string.Empty,
-                FaceImageBase64 = cardFullData.Dg2File?.FaceImage
-            };
-
+            var citizenDto = ExtractCitizenDto(cardFullData);
             var session = _sessionManager.CreateSession(citizenDto);
-            _logger.LogInformation("Đọc thẻ CCCD thành công cho số {CardNumber}, SessionId: {SessionId}", citizenDto.CardNumber, session.SessionId);
-
-            await _hubContext.Clients.All.CardReadSuccess(new
-            {
-                @event = "CardReadSuccess",
-                sessionId = session.SessionId,
-                cardData = citizenDto,
-                timestamp = DateTime.Now
-            });
-
             return citizenDto;
         }
         catch (OperationCanceledException)
@@ -262,6 +321,23 @@ public class Hn212CardReaderService : ICardReaderService
                 _readTcs = null;
             }
         }
+    }
+
+    private static CitizenCardDto ExtractCitizenDto(CardFullData cardFullData)
+    {
+        return new CitizenCardDto
+        {
+            CardNumber = cardFullData.Dg13File?.DocumentNumber ?? string.Empty,
+            FullName = cardFullData.Dg13File?.Name ?? string.Empty,
+            DateOfBirth = cardFullData.Dg13File?.DateOfBirth ?? string.Empty,
+            Gender = cardFullData.Dg13File?.Sex ?? string.Empty,
+            Nationality = cardFullData.Dg13File?.Nationality ?? "Việt Nam",
+            Hometown = cardFullData.Dg13File?.Hometown ?? string.Empty,
+            PermanentAddress = cardFullData.Dg13File?.Address ?? string.Empty,
+            IssueDate = cardFullData.Dg13File?.IssueDate ?? string.Empty,
+            ExpiryDate = cardFullData.Dg13File?.ExpiredDate ?? string.Empty,
+            FaceImageBase64 = cardFullData.Dg2File?.FaceImage
+        };
     }
 
     public void Dispose()

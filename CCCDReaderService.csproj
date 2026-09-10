@@ -26,6 +26,7 @@
 
     <!-- 4. Image Processing -->
     <PackageReference Include="OpenCvSharp4" Version="4.8.0.20230708" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.8.0.20230708" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.8.0.20230708" />
     <PackageReference Include="SkiaSharp" Version="2.88.6" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
@@ -51,9 +52,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="native-lib\**\*.*">
-	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</None>
+    <None Include="native-lib\*.*">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

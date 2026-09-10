@@ -9,6 +9,7 @@ public interface ICardReaderService : IDisposable
     Task<CitizenCardDto> ReadCardAsync(CancellationToken cancellationToken = default);
     void StartMonitoring();
     void StopMonitoring();
+    void PauseInternalCamera(bool doPause, int timeoutMs = 2000);
 
     event EventHandler<EventArgs>? CardInserted;
     event EventHandler<EventArgs>? CardRemoved;

@@ -134,6 +134,7 @@ public class CardReadEndpointTests
 
         public void StartMonitoring() { }
         public void StopMonitoring() { }
+        public void PauseInternalCamera(bool doPause, int timeoutMs = 2000) { }
         public void Dispose() { }
     }
 }

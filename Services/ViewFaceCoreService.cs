@@ -11,15 +11,19 @@ namespace CCCDReaderService.Services;
 public class ViewFaceCoreService : IFaceService
 {
     private readonly ILogger<ViewFaceCoreService> _logger;
+    private readonly ICardReaderService? _cardReaderService;
     private readonly FaceDetector _detector;
     private readonly FaceLandmarker _landmarker;
     private readonly FaceRecognizer _recognizer;
     private readonly FaceAntiSpoofing _antiSpoofing;
     private readonly object _lock = new();
 
-    public ViewFaceCoreService(ILogger<ViewFaceCoreService> logger)
+    public ViewFaceCoreService(
+        ILogger<ViewFaceCoreService> logger,
+        ICardReaderService? cardReaderService = null)
     {
         _logger = logger;
+        _cardReaderService = cardReaderService;
         _detector = new FaceDetector();
         _landmarker = new FaceLandmarker();
         _recognizer = new FaceRecognizer();
@@ -48,6 +52,9 @@ public class ViewFaceCoreService : IFaceService
         {
             try
             {
+                // Tạm dừng Camera OCR trong của đầu đọc HN-212 theo tài liệu Hanel để tránh xung đột cùng USB-Controller
+                _cardReaderService?.PauseInternalCamera(true, 3000);
+
                 using var capture = new VideoCapture(0, VideoCaptureAPIs.DSHOW);
                 if (!capture.IsOpened())
                 {
@@ -78,6 +85,10 @@ public class ViewFaceCoreService : IFaceService
             {
                 _logger.LogError(ex, "Lỗi khi thao tác với phần cứng Camera.");
                 throw new CameraNotAvailableException("Lỗi truy cập Camera: " + ex.Message);
+            }
+            finally
+            {
+                _cardReaderService?.PauseInternalCamera(false, 0);
             }
         }
     }
