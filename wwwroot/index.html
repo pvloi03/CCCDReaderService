@@ -1,145 +1,241 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCCD Reader Service</title>
-    <style>
-        :root {
-            --bg: #0f172a;
-            --card-bg: rgba(30, 41, 59, 0.7);
-            --accent: #38bdf8;
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --success: #22c55e;
-            --border: rgba(255, 255, 255, 0.1);
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: radial-gradient(circle at top right, #1e293b, #0f172a);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-        }
-        .container {
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 540px;
-            width: 100%;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            text-align: center;
-        }
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 16px;
-            background: rgba(34, 197, 94, 0.15);
-            color: var(--success);
-            border-radius: 999px;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-        .dot {
-            width: 8px;
-            height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--success);
-        }
-        h1 {
-            font-size: 26px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            background: linear-gradient(135deg, #ffffff, var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        p {
-            color: var(--text-muted);
-            font-size: 15px;
-            line-height: 1.6;
-            margin-bottom: 24px;
-        }
-        .info-box {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            text-align: left;
-            font-size: 14px;
-            margin-bottom: 24px;
-        }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .info-row:last-child { border-bottom: none; }
-        .info-label { color: var(--text-muted); }
-        .info-val { font-weight: 600; color: var(--accent); }
-        .btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #0284c7, #0369a1);
-            color: white;
-            text-decoration: none;
-            padding: 10px 24px;
-            border-radius: 10px;
-            font-weight: 600;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(2, 132, 199, 0.4);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Giao diện Web Dashboard điều khiển và giám sát dịch vụ đọc thẻ CCCD gắn chip và nhận diện khuôn mặt sinh trắc học thời gian thực.">
+  <title>CCCD Reader & Face Recognition Service - Dashboard</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="badge">
-            <span class="dot"></span> Dịch vụ đang hoạt động
-        </div>
-        <h1>CCCD Reader Service</h1>
-        <p>Dịch vụ đọc thẻ CCCD gắn chip và nhận diện khuôn mặt đang chạy ngầm trong máy tính.</p>
-        
-        <div class="info-box">
-            <div class="info-row">
-                <span class="info-label">Cổng lắng nghe:</span>
-                <span class="info-val">http://localhost:5200</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Trạng thái API:</span>
-                <span class="info-val" id="api-status">Đang kiểm tra...</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Chế độ vận hành:</span>
-                <span class="info-val">System Tray (Background)</span>
-            </div>
-        </div>
 
-        <a href="/api/device/status" class="btn" target="_blank">Xem API Status (JSON)</a>
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <line x1="7" y1="9" x2="11" y2="9" />
+          <line x1="7" y1="13" x2="9" y2="13" />
+          <circle cx="15" cy="11" r="2" />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>CCCD Reader & Face Service</h1>
+        <span>Hệ thống Quản lý Thiết bị & Sinh trắc học Thời gian thực</span>
+      </div>
     </div>
 
-    <script>
-        fetch('/api/device/status')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('api-status').textContent = data.isOnline ? 'Online (Sẵn sàng)' : 'Offline';
-            })
-            .catch(err => {
-                document.getElementById('api-status').textContent = 'Lỗi kết nối';
-            });
-    </script>
+    <div class="status-toolbar">
+      <div id="chip-ws-status" class="status-chip offline" title="Trạng thái WebSocket Hub">
+        <span class="status-dot"></span>
+        <span class="chip-text">SignalR: Đang kết nối...</span>
+      </div>
+      <div id="chip-reader-status" class="status-chip offline" title="Đầu đọc thẻ HN-212">
+        <span class="status-dot"></span>
+        <span class="chip-text">Đầu đọc: Đang kiểm tra</span>
+      </div>
+      <div id="chip-card-status" class="status-chip offline" title="Trạng thái thẻ trong khe">
+        <span class="status-dot"></span>
+        <span class="chip-text">Thẻ: Chưa cắm</span>
+      </div>
+      <div id="chip-camera-status" class="status-chip offline" title="Thiết bị Camera / Webcam">
+        <span class="status-dot"></span>
+        <span class="chip-text">Camera: Đang kiểm tra</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Grid -->
+  <main>
+    
+    <!-- LEFT PANEL: CCCD Card Info -->
+    <section class="panel" id="panel-card-reader">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="3" />
+            <path d="M7 15h10M7 11h2M15 11h2" />
+          </svg>
+          <h2>Thẻ Căn Cước Công Dân (Vi Mạch Chip)</h2>
+        </div>
+        <div id="session-badge" class="result-badge badge-waiting">
+          Chưa có phiên
+        </div>
+      </div>
+
+      <!-- CCCD Visual Simulator Card -->
+      <div class="cccd-card" id="cccd-card-display">
+        <div class="cccd-photo-box" id="cccd-photo-container">
+          <img id="cccd-face-img" src="" alt="Ảnh chân dung thẻ CCCD" />
+          <div class="photo-placeholder" id="cccd-photo-placeholder">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>Ảnh Chân Dung Chip (DG2)</span>
+          </div>
+        </div>
+
+        <div class="cccd-details">
+          <div class="cccd-header-line">
+            <span class="cccd-country">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</span>
+            <div class="cccd-chip-icon" title="Vi mạch bán dẫn eID (ICAO 9303)"></div>
+          </div>
+
+          <div class="cccd-field">
+            <span class="cccd-label">Số định danh cá nhân / CCCD</span>
+            <span class="cccd-value highlight" id="cccd-val-number">---</span>
+          </div>
+
+          <div class="cccd-field">
+            <span class="cccd-label">Họ và tên</span>
+            <span class="cccd-value" id="cccd-val-name">---</span>
+          </div>
+
+          <div class="cccd-grid-2">
+            <div class="cccd-field">
+              <span class="cccd-label">Ngày sinh</span>
+              <span class="cccd-value" id="cccd-val-dob">---</span>
+            </div>
+            <div class="cccd-field">
+              <span class="cccd-label">Giới tính</span>
+              <span class="cccd-value" id="cccd-val-gender">---</span>
+            </div>
+          </div>
+
+          <div class="cccd-grid-2">
+            <div class="cccd-field">
+              <span class="cccd-label">Quê quán</span>
+              <span class="cccd-value" id="cccd-val-hometown">---</span>
+            </div>
+            <div class="cccd-field">
+              <span class="cccd-label">Ngày hết hạn</span>
+              <span class="cccd-value" id="cccd-val-expiry">---</span>
+            </div>
+          </div>
+
+          <div class="cccd-field">
+            <span class="cccd-label">Nơi thường trú</span>
+            <span class="cccd-value" id="cccd-val-address">---</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="button-row">
+        <button id="btn-read-card" class="btn-primary" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          Đọc thẻ CCCD
+        </button>
+        <button id="btn-cancel-session" class="btn-danger" type="button" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+          Hủy phiên
+        </button>
+        <button id="btn-refresh-status" class="btn-secondary" type="button">
+          Làm mới trạng thái
+        </button>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Camera & Face Matching -->
+    <section class="panel" id="panel-face-verify">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          <h2>Xác Thực Khuôn Mặt (Anti-Spoofing & Matching)</h2>
+        </div>
+        <div id="liveness-badge" class="result-badge badge-waiting">
+          Chờ xác thực
+        </div>
+      </div>
+
+      <!-- Camera Live Preview Frame -->
+      <div class="camera-container" id="camera-frame-box">
+        <img id="camera-preview-img" src="" alt="Khung hình camera" style="display:none;" />
+        <video id="camera-video" autoplay playsinline muted></video>
+        <div class="camera-overlay">
+          <div class="face-scan-frame" id="scan-indicator"></div>
+        </div>
+      </div>
+
+      <!-- Match Result Display Bar -->
+      <div class="result-card">
+        <div>
+          <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Kết quả kiểm tra</div>
+          <div style="font-size:15px; font-weight:700; margin-top:2px;" id="verification-conclusion">Chưa thực hiện</div>
+        </div>
+
+        <div class="similarity-gauge">
+          <div class="similarity-val" id="val-similarity">0%</div>
+          <div class="similarity-bar-bg">
+            <div class="similarity-bar-fill" id="bar-similarity-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Face Action Buttons -->
+      <div class="button-row">
+        <button id="btn-verify-face" class="btn-success" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          Xác thực khuôn mặt
+        </button>
+        <button id="btn-capture-frame" class="btn-secondary" type="button">
+          Chụp ảnh Camera
+        </button>
+        <button id="btn-switch-cam-mode" class="btn-secondary" type="button">
+          Dùng Camera Trực Tiếp
+        </button>
+      </div>
+    </section>
+
+    <!-- BOTTOM PANEL: Event Log Console -->
+    <section class="panel log-panel" id="panel-event-logs">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24">
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+          <h2>Nhật Ký Sự Kiện Thời Gian Thực (SignalR Events & Logs)</h2>
+        </div>
+        <button id="btn-clear-log" class="btn-secondary" style="padding:6px 14px; font-size:11px;" type="button">
+          Xóa nhật ký
+        </button>
+      </div>
+
+      <div class="terminal-console" id="log-console" role="log" aria-live="polite">
+        <!-- Logs injected dynamically here -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    CCCDReaderService v1.0.0 &bull; Cổng dịch vụ ngầm Windows (Port 5200) &bull; Tích hợp RAR SDK HN-212 & ViewFaceCore AI
+  </footer>
+
+  <!-- SignalR & Application Scripts -->
+  <script src="js/signalr.min.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
