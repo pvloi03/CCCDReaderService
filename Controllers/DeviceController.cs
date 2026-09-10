@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using CCCDReaderService.Models;
+using CCCDReaderService.Services;
 
 namespace CCCDReaderService.Controllers;
 
@@ -7,11 +8,18 @@ namespace CCCDReaderService.Controllers;
 [Route("api/[controller]")]
 public class DeviceController : ControllerBase
 {
+    private readonly ISessionManager? _sessionManager;
+    private readonly IHardwareLock? _hardwareLock;
     private readonly ILogger<DeviceController> _logger;
 
-    public DeviceController(ILogger<DeviceController> logger)
+    public DeviceController(
+        ILogger<DeviceController> logger,
+        ISessionManager? sessionManager = null,
+        IHardwareLock? hardwareLock = null)
     {
         _logger = logger;
+        _sessionManager = sessionManager;
+        _hardwareLock = hardwareLock;
     }
 
     /// <summary>
@@ -20,13 +28,18 @@ public class DeviceController : ControllerBase
     [HttpGet("status")]
     public ActionResult<DeviceStatusDto> GetStatus()
     {
+        var activeSession = _sessionManager?.GetActiveSession();
+        var isCardLocked = _hardwareLock?.IsLocked("CardReader") ?? false;
+        var isCameraLocked = _hardwareLock?.IsLocked("Camera") ?? false;
+
         var status = new DeviceStatusDto
         {
             IsOnline = true,
             Service = "CCCDReaderService",
             Version = "1.0.0",
-            CardReaderStatus = "Ready",
-            CameraStatus = "Ready",
+            CardReaderStatus = isCardLocked ? "Busy" : "Ready",
+            CameraStatus = isCameraLocked ? "Busy" : "Ready",
+            ActiveSessionId = activeSession?.SessionId,
             ServerTime = DateTime.Now
         };
 

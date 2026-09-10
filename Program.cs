@@ -1,4 +1,5 @@
 using CCCDReaderService.Tray;
+using CCCDReaderService.Services;
 
 namespace CCCDReaderService;
 
@@ -19,6 +20,12 @@ internal static class Program
             builder.WebHost.UseUrls(configuredUrl);
 
             builder.Services.AddControllers();
+
+            // Đăng ký các dịch vụ cốt lõi (Session & Hardware Lock)
+            var sessionTimeout = builder.Configuration.GetValue<int>("ReaderSettings:SessionTimeoutSeconds", 120);
+            builder.Services.AddSingleton<ISessionManager>(new Services.SessionManager(sessionTimeout));
+            builder.Services.AddSingleton<Services.IHardwareLock, Services.HardwareLock>();
+
             builder.Services.AddCors(options =>
             {
                 options.AddDefaultPolicy(policy =>
