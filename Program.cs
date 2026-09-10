@@ -27,6 +27,7 @@ internal static class Program
             builder.Services.AddSingleton<ISessionManager>(new Services.SessionManager(sessionTimeout));
             builder.Services.AddSingleton<Services.IHardwareLock, Services.HardwareLock>();
             builder.Services.AddSingleton<Services.ICardReaderService, Services.Hn212CardReaderService>();
+            builder.Services.AddSingleton<Services.IFaceService, Services.ViewFaceCoreService>();
 
             builder.Services.AddCors(options =>
             {

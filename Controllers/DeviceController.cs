@@ -10,16 +10,22 @@ public class DeviceController : ControllerBase
 {
     private readonly ISessionManager? _sessionManager;
     private readonly IHardwareLock? _hardwareLock;
+    private readonly ICardReaderService? _cardReaderService;
+    private readonly IFaceService? _faceService;
     private readonly ILogger<DeviceController> _logger;
 
     public DeviceController(
         ILogger<DeviceController> logger,
         ISessionManager? sessionManager = null,
-        IHardwareLock? hardwareLock = null)
+        IHardwareLock? hardwareLock = null,
+        ICardReaderService? cardReaderService = null,
+        IFaceService? faceService = null)
     {
         _logger = logger;
         _sessionManager = sessionManager;
         _hardwareLock = hardwareLock;
+        _cardReaderService = cardReaderService;
+        _faceService = faceService;
     }
 
     /// <summary>
@@ -32,13 +38,33 @@ public class DeviceController : ControllerBase
         var isCardLocked = _hardwareLock?.IsLocked("CardReader") ?? false;
         var isCameraLocked = _hardwareLock?.IsLocked("Camera") ?? false;
 
+        string cardStatus = "Ready";
+        if (_cardReaderService != null && !_cardReaderService.IsDeviceConnected)
+        {
+            cardStatus = "Disconnected";
+        }
+        else if (isCardLocked)
+        {
+            cardStatus = "Busy";
+        }
+
+        string cameraStatus = "Ready";
+        if (_faceService != null && !_faceService.IsCameraAvailable)
+        {
+            cameraStatus = "Disconnected";
+        }
+        else if (isCameraLocked)
+        {
+            cameraStatus = "Busy";
+        }
+
         var status = new DeviceStatusDto
         {
             IsOnline = true,
             Service = "CCCDReaderService",
             Version = "1.0.0",
-            CardReaderStatus = isCardLocked ? "Busy" : "Ready",
-            CameraStatus = isCameraLocked ? "Busy" : "Ready",
+            CardReaderStatus = cardStatus,
+            CameraStatus = cameraStatus,
             ActiveSessionId = activeSession?.SessionId,
             ServerTime = DateTime.Now
         };

@@ -107,9 +107,11 @@ public class CardReadEndpointTests
         public bool IsDeviceConnected => _isConnected;
         public bool HasCardInReader => _hasCard;
 
+#pragma warning disable CS0067
         public event EventHandler<EventArgs>? CardInserted;
         public event EventHandler<EventArgs>? CardRemoved;
         public event EventHandler<string>? DeviceStatusChanged;
+#pragma warning restore CS0067
 
         public StubCardReaderService(bool isConnected, bool hasCard, CitizenCardDto? cardToReturn = null)
         {
