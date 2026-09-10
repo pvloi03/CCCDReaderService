@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCCD Reader Service</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent: #38bdf8;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .container {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 540px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+        }
+        h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #ffffff, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        p {
+            color: var(--text-muted);
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .info-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: left;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: var(--text-muted); }
+        .info-val { font-weight: 600; color: var(--accent); }
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            text-decoration: none;
+            padding: 10px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(2, 132, 199, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="badge">
+            <span class="dot"></span> Dịch vụ đang hoạt động
+        </div>
+        <h1>CCCD Reader Service</h1>
+        <p>Dịch vụ đọc thẻ CCCD gắn chip và nhận diện khuôn mặt đang chạy ngầm trong máy tính.</p>
+        
+        <div class="info-box">
+            <div class="info-row">
+                <span class="info-label">Cổng lắng nghe:</span>
+                <span class="info-val">http://localhost:5200</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Trạng thái API:</span>
+                <span class="info-val" id="api-status">Đang kiểm tra...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Chế độ vận hành:</span>
+                <span class="info-val">System Tray (Background)</span>
+            </div>
+        </div>
+
+        <a href="/api/device/status" class="btn" target="_blank">Xem API Status (JSON)</a>
+    </div>
+
+    <script>
+        fetch('/api/device/status')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('api-status').textContent = data.isOnline ? 'Online (Sẵn sàng)' : 'Offline';
+            })
+            .catch(err => {
+                document.getElementById('api-status').textContent = 'Lỗi kết nối';
+            });
+    </script>
+</body>
+</html>

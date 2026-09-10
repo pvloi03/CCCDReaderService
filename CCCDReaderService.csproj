@@ -2,6 +2,7 @@
 
   <PropertyGroup>
 	<TargetFramework>net10.0-windows</TargetFramework>
+	<OutputType>WinExe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 	<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -10,9 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 1. API & Docs -->
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-
     <!-- 2. Device, Logging & Camera -->
     <PackageReference Include="DirectShowLib.Standard" Version="2.1.0" />
     <PackageReference Include="log4net" Version="3.3.2" />
