@@ -165,10 +165,17 @@
         </div>
       </div>
 
-      <!-- Camera Live Preview Frame -->
+      <!-- Camera Device Preview Frame -->
       <div class="camera-container" id="camera-frame-box">
-        <img id="camera-preview-img" src="" alt="Khung hình camera" style="display:none;" />
-        <video id="camera-video" autoplay playsinline muted></video>
+        <img id="camera-preview-img" src="" alt="Khung hình camera thiết bị HN-212" style="display:none;" />
+        <div class="photo-placeholder" id="camera-placeholder" style="display:flex;">
+          <svg viewBox="0 0 24 24" style="width:48px; height:48px;">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          <span style="margin-top:8px; font-weight:600;">Camera Thiết Bị HN-212</span>
+          <span style="font-size:11px; color:var(--text-muted);">Tích hợp sẵn trên đầu đọc CCCD</span>
+        </div>
         <div class="camera-overlay">
           <div class="face-scan-frame" id="scan-indicator"></div>
         </div>
@@ -199,10 +206,7 @@
           Xác thực khuôn mặt
         </button>
         <button id="btn-capture-frame" class="btn-secondary" type="button">
-          Chụp ảnh Camera
-        </button>
-        <button id="btn-switch-cam-mode" class="btn-secondary" type="button">
-          Dùng Camera Trực Tiếp
+          Chụp ảnh từ Thiết bị
         </button>
       </div>
     </section>

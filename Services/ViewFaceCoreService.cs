@@ -34,6 +34,11 @@ public class ViewFaceCoreService : IFaceService
     {
         get
         {
+            if (_cardReaderService != null && _cardReaderService.IsDeviceCameraConnected)
+            {
+                return true;
+            }
+
             try
             {
                 using var capture = new VideoCapture(0, VideoCaptureAPIs.DSHOW);
@@ -46,23 +51,30 @@ public class ViewFaceCoreService : IFaceService
         }
     }
 
-    public Task<string> CaptureFrameBase64Async(CancellationToken cancellationToken = default)
+    public async Task<string> CaptureFrameBase64Async(CancellationToken cancellationToken = default)
     {
+        // 1. Ưu tiên sử dụng Camera tích hợp của thiết bị đầu đọc HN-212
+        if (_cardReaderService != null && _cardReaderService.IsDeviceCameraConnected)
+        {
+            _logger.LogInformation("Đang chụp ảnh khuôn mặt từ Camera tích hợp của thiết bị HN-212...");
+            var deviceFaceBytes = await _cardReaderService.CaptureFaceFromDeviceAsync(cancellationToken);
+            return Convert.ToBase64String(deviceFaceBytes);
+        }
+
+        // 2. Dự phòng (fallback) nếu thiết bị không có camera: dùng camera máy tính
         lock (_lock)
         {
             try
             {
-                // Tạm dừng Camera OCR trong của đầu đọc HN-212 theo tài liệu Hanel để tránh xung đột cùng USB-Controller
                 _cardReaderService?.PauseInternalCamera(true, 3000);
 
                 using var capture = new VideoCapture(0, VideoCaptureAPIs.DSHOW);
                 if (!capture.IsOpened())
                 {
-                    throw new CameraNotAvailableException("Không thể kết nối đến Camera trên máy tính.");
+                    throw new CameraNotAvailableException("Không thể kết nối đến Camera của thiết bị hay máy tính.");
                 }
 
                 using var mat = new Mat();
-                // Đọc bỏ vài frame đầu để auto-exposure và cân bằng trắng ổn định
                 for (int i = 0; i < 3; i++)
                 {
                     capture.Read(mat);
@@ -75,7 +87,7 @@ public class ViewFaceCoreService : IFaceService
 
                 Cv2.ImEncode(".jpg", mat, out var buf);
                 var base64 = Convert.ToBase64String(buf);
-                return Task.FromResult(base64);
+                return base64;
             }
             catch (CameraNotAvailableException)
             {

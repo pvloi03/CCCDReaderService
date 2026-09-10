@@ -20,7 +20,10 @@ public class Hn212CardReaderService : ICardReaderService
 
     private bool _isMonitoring;
     private bool _hasCard;
+    private bool _isDeviceCameraConnected;
+    private byte[]? _lastFrameBytes;
     private TaskCompletionSource<CardFullData>? _readTcs;
+    private TaskCompletionSource<byte[]>? _faceCaptureTcs;
 
     public bool IsDeviceConnected
     {
@@ -33,6 +36,22 @@ public class Hn212CardReaderService : ICardReaderService
             catch
             {
                 return false;
+            }
+        }
+    }
+
+    public bool IsDeviceCameraConnected
+    {
+        get
+        {
+            try
+            {
+                var cams = _reader.GetCameraList(true);
+                return (cams != null && cams.Count > 0) || _isDeviceCameraConnected;
+            }
+            catch
+            {
+                return _isDeviceCameraConnected;
             }
         }
     }
@@ -61,9 +80,21 @@ public class Hn212CardReaderService : ICardReaderService
         }
     }
 
+    public byte[]? LastFrameBytes
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _lastFrameBytes;
+            }
+        }
+    }
+
     public event EventHandler<EventArgs>? CardInserted;
     public event EventHandler<EventArgs>? CardRemoved;
     public event EventHandler<string>? DeviceStatusChanged;
+    public event EventHandler<byte[]>? VideoFrameReceived;
 
     public Hn212CardReaderService(
         ISessionManager sessionManager,
@@ -77,6 +108,7 @@ public class Hn212CardReaderService : ICardReaderService
         _logger = logger;
         _reader = new VnHn212Reader();
         _reader.OnStatusChanged += OnReaderStatusChanged;
+        _reader.OnVideoFrame += OnReaderVideoFrame;
     }
 
     public void StartMonitoring()
@@ -134,6 +166,109 @@ public class Hn212CardReaderService : ICardReaderService
         catch (Exception ex)
         {
             _logger.LogWarning("Lỗi khi tạm dừng OCR-Camera nội bộ: {Message}", ex.Message);
+        }
+    }
+
+    private void OnReaderVideoFrame(object sender, StatusEventArgs e)
+    {
+        if (e is not CaptureEventArgs vd) return;
+
+        var frameData = vd.FaceData ?? vd.FrameData;
+        if (frameData != null && frameData.Length > 0)
+        {
+            lock (_lock)
+            {
+                _lastFrameBytes = frameData;
+            }
+
+            VideoFrameReceived?.Invoke(this, frameData);
+
+            lock (_lock)
+            {
+                if (_faceCaptureTcs != null && !_faceCaptureTcs.Task.IsCompleted)
+                {
+                    if (vd.Status == FACE_CAPTURE_STATAUS.SUCCESS)
+                    {
+                        _logger.LogInformation("HN-212 Camera chụp khuôn mặt thành công (FaceType: {Type})", vd.FaceType);
+                        _faceCaptureTcs.TrySetResult(frameData);
+                    }
+                }
+            }
+        }
+    }
+
+    public async Task<byte[]> CaptureFaceFromDeviceAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsDeviceConnected)
+        {
+            throw new DeviceNotConnectedException("Thiết bị đầu đọc HN-212 chưa được kết nối.");
+        }
+
+        using var lockHandle = await _hardwareLock.TryAcquireAsync("Camera", TimeSpan.FromSeconds(2), cancellationToken);
+        if (lockHandle == null)
+        {
+            throw new InvalidOperationException("Camera thiết bị đang bận phục vụ một tiến trình khác.");
+        }
+
+        lock (_lock)
+        {
+            _faceCaptureTcs = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        try
+        {
+            _logger.LogInformation("Kích hoạt Camera thiết bị HN-212 chụp khuôn mặt (StartFaceCapture)...");
+            _reader.StartFaceCapture();
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            linkedCts.Token.Register(() => _faceCaptureTcs.TrySetCanceled());
+
+            var faceBytes = await _faceCaptureTcs.Task;
+            return faceBytes;
+        }
+        catch (OperationCanceledException)
+        {
+            // Fallback: nếu camera thiết bị đã có last frame hợp lệ
+            lock (_lock)
+            {
+                if (_lastFrameBytes != null && _lastFrameBytes.Length > 0)
+                {
+                    return _lastFrameBytes;
+                }
+            }
+            throw new CameraNotAvailableException("Quá trình chụp khuôn mặt từ Camera thiết bị bị quá thời gian chờ.");
+        }
+        finally
+        {
+            try
+            {
+                _reader.StopFaceCapture();
+            }
+            catch
+            {
+                // ignore
+            }
+
+            lock (_lock)
+            {
+                _faceCaptureTcs = null;
+            }
+        }
+    }
+
+    public int CompareFace(byte[] chipFaceBytes, byte[] camFaceBytes)
+    {
+        try
+        {
+            int score = _reader.CompareFace(chipFaceBytes, camFaceBytes);
+            _logger.LogInformation("HN-212 SDK CompareFace trả về điểm: {Score}%", score);
+            return score;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Lỗi khi so khớp khuôn mặt qua SDK CompareFace: {Message}", ex.Message);
+            return 0;
         }
     }
 
@@ -214,13 +349,13 @@ public class Hn212CardReaderService : ICardReaderService
     {
         if (ev == null) return;
 
-        bool isCamConnected = ev.NewState == CAMERA_STATUS.PRESENT;
+        _isDeviceCameraConnected = ev.NewState == CAMERA_STATUS.PRESENT;
         _logger.LogInformation("Camera đầu đọc trạng thái: {State}", ev.NewState);
         _hubContext.Clients.All.DeviceStatusChanged(new
         {
             @event = "DeviceStatusChanged",
             device = "ReaderCamera",
-            status = isCamConnected ? "Connected" : "Disconnected",
+            status = _isDeviceCameraConnected ? "Connected" : "Disconnected",
             timestamp = DateTime.Now
         });
     }
@@ -346,6 +481,7 @@ public class Hn212CardReaderService : ICardReaderService
         try
         {
             _reader.OnStatusChanged -= OnReaderStatusChanged;
+            _reader.OnVideoFrame -= OnReaderVideoFrame;
         }
         catch
         {

@@ -105,12 +105,15 @@ public class CardReadEndpointTests
         public Exception? ThrowOnRead { get; set; }
 
         public bool IsDeviceConnected => _isConnected;
+        public bool IsDeviceCameraConnected => true;
         public bool HasCardInReader => _hasCard;
+        public byte[]? LastFrameBytes => null;
 
 #pragma warning disable CS0067
         public event EventHandler<EventArgs>? CardInserted;
         public event EventHandler<EventArgs>? CardRemoved;
         public event EventHandler<string>? DeviceStatusChanged;
+        public event EventHandler<byte[]>? VideoFrameReceived;
 #pragma warning restore CS0067
 
         public StubCardReaderService(bool isConnected, bool hasCard, CitizenCardDto? cardToReturn = null)
@@ -130,6 +133,16 @@ public class CardReadEndpointTests
                 CardNumber = "001200000001",
                 FullName = "TEST CITIZEN"
             });
+        }
+
+        public Task<byte[]> CaptureFaceFromDeviceAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new byte[] { 1, 2, 3 });
+        }
+
+        public int CompareFace(byte[] chipFaceBytes, byte[] camFaceBytes)
+        {
+            return 85;
         }
 
         public void StartMonitoring() { }

@@ -294,77 +294,40 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchDeviceStatus();
   });
 
-  // 7. Khởi động Camera Browser (Webcam)
-  async function startBrowserCamera() {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        localVideoStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
-        });
-        cameraVideo.srcObject = localVideoStream;
-        cameraVideo.style.display = 'block';
-        cameraPreviewImg.style.display = 'none';
-        logEvent('CAMERA', 'Đã mở luồng video webcam trực tiếp trên trình duyệt.', 'success');
-      } catch (err) {
-        logEvent('CAMERA', 'Không thể mở webcam trình duyệt (' + err.name + '). Sẽ sử dụng camera dịch vụ.', 'warning');
-        useBrowserWebcam = false;
-        btnSwitchCamMode.textContent = 'Dùng Camera Service';
-      }
-    } else {
-      useBrowserWebcam = false;
-    }
-  }
+  // 7. Chụp ảnh trực tiếp từ Camera thiết bị HN-212
+  const cameraPlaceholder = document.getElementById('camera-placeholder');
 
-  btnSwitchCamMode.addEventListener('click', () => {
-    useBrowserWebcam = !useBrowserWebcam;
-    if (useBrowserWebcam) {
-      btnSwitchCamMode.textContent = 'Dùng Camera Trực Tiếp';
-      startBrowserCamera();
-    } else {
-      btnSwitchCamMode.textContent = 'Dùng Camera Service';
-      if (localVideoStream) {
-        localVideoStream.getTracks().forEach(t => t.stop());
-        localVideoStream = null;
-      }
-      cameraVideo.style.display = 'none';
-      cameraPreviewImg.style.display = 'block';
-      logEvent('CAMERA', 'Chuyển sang chế độ gọi Camera phần cứng của Service.');
-    }
-  });
-
-  // 8. Chụp khung hình từ Camera
   btnCaptureFrame.addEventListener('click', async () => {
-    logEvent('CAMERA', 'Đang chụp khung hình...');
-    if (useBrowserWebcam && localVideoStream) {
-      const canvas = document.createElement('canvas');
-      canvas.width = cameraVideo.videoWidth || 640;
-      canvas.height = cameraVideo.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      cameraPreviewImg.src = dataUrl;
-      cameraPreviewImg.style.display = 'block';
-      cameraVideo.style.display = 'none';
-      logEvent('CAMERA', 'Đã chụp khung hình từ webcam trình duyệt.', 'success');
-    } else {
-      try {
-        const res = await fetch('/api/face/capture');
-        const data = await res.json();
-        if (res.ok && data.imageBase64) {
-          cameraPreviewImg.src = 'data:image/jpeg;base64,' + data.imageBase64;
-          cameraPreviewImg.style.display = 'block';
-          cameraVideo.style.display = 'none';
-          logEvent('CAMERA', 'Đã chụp khung hình thành công từ Camera Service.', 'success');
-        } else {
-          alert('Lỗi chụp camera: ' + (data.message || 'Không khả dụng.'));
+    btnCaptureFrame.disabled = true;
+    btnCaptureFrame.textContent = 'Đang chụp từ thiết bị...';
+    logEvent('CAMERA', 'Kích hoạt chụp ảnh từ Camera tích hợp của thiết bị HN-212...');
+
+    try {
+      const res = await fetch('/api/face/capture');
+      const data = await res.json();
+      if (res.ok && data.imageBase64) {
+        let src = data.imageBase64;
+        if (!src.startsWith('data:')) {
+          src = 'data:image/jpeg;base64,' + src;
         }
-      } catch (err) {
-        logEvent('CAMERA', 'Lỗi gọi API capture: ' + err.message, 'error');
+        cameraPreviewImg.src = src;
+        cameraPreviewImg.style.display = 'block';
+        if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
+        logEvent('CAMERA', 'Đã thu được ảnh khuôn mặt từ Camera thiết bị thành công.', 'success');
+      } else {
+        logEvent('CAMERA', 'Lỗi chụp từ thiết bị: ' + (data.message || 'Không khả dụng.'), 'error');
+        alert('Lỗi chụp camera: ' + (data.message || 'Thiết bị camera chưa sẵn sàng.'));
       }
+    } catch (err) {
+      logEvent('CAMERA', 'Lỗi kết nối khi chụp ảnh: ' + err.message, 'error');
+      alert('Không thể kết nối đến thiết bị.');
+    } finally {
+      btnCaptureFrame.disabled = false;
+      btnCaptureFrame.textContent = 'Chụp ảnh từ Thiết bị';
     }
   });
 
-  // 9. Xác thực khuôn mặt (Face Verification & Anti-Spoofing)
+  // 8. Xác thực khuôn mặt (Face Verification & Anti-Spoofing qua Camera thiết bị)
   btnVerifyFace.addEventListener('click', async () => {
     if (!hasActiveCardFace) {
       alert('Vui lòng đọc thẻ CCCD trước để lấy ảnh chân dung chip đối chiếu!');
@@ -372,33 +335,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btnVerifyFace.disabled = true;
-    btnVerifyFace.textContent = 'Đang nhận diện...';
-    verificationConclusion.textContent = 'Đang phân tích AI sinh trắc học...';
-    logEvent('FACE_VERIFY', 'Bắt đầu quá trình đối soát khuôn mặt và kiểm tra người thật (FAS)...');
+    btnVerifyFace.textContent = 'Đang nhận diện từ thiết bị...';
+    verificationConclusion.textContent = 'Thiết bị đang chụp & phân tích sinh trắc học...';
+    logEvent('FACE_VERIFY', 'Kích hoạt Camera thiết bị chụp khuôn mặt và đối soát thẻ CCCD...');
 
     try {
-      let requestBody = {};
-
-      if (useBrowserWebcam && localVideoStream) {
-        // Chụp frame từ video element
-        const canvas = document.createElement('canvas');
-        canvas.width = cameraVideo.videoWidth || 640;
-        canvas.height = cameraVideo.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        requestBody.cameraImageBase64 = dataUrl;
-      }
-
+      // Gửi body rỗng để backend sử dụng trực tiếp Camera của thiết bị HN-212
       const res = await fetch('/api/face/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({})
       });
 
       const data = await res.json();
 
       if (res.ok) {
+        if (data.capturedFaceImageBase64) {
+          let src = data.capturedFaceImageBase64;
+          if (!src.startsWith('data:')) {
+            src = 'data:image/jpeg;base64,' + src;
+          }
+          cameraPreviewImg.src = src;
+          cameraPreviewImg.style.display = 'block';
+          if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
+        }
+
         const pct = Math.round(data.similarity * 100);
         valSimilarity.textContent = pct + '%';
         barSimilarityFill.style.width = Math.min(pct, 100) + '%';
@@ -408,13 +369,13 @@ document.addEventListener('DOMContentLoaded', () => {
           livenessBadge.textContent = 'Người thật (Live)';
           verificationConclusion.textContent = `HỢP LỆ: Trùng khớp (${pct}%)`;
           verificationConclusion.style.color = 'var(--accent-green)';
-          logEvent('FACE_VERIFY', `Xác thực THÀNH CÔNG: Độ tương đồng ${pct}%, Trạng thái: ${data.livenessStatus}`, 'success');
+          logEvent('FACE_VERIFY', `Xác thực THÀNH CÔNG qua thiết bị: Độ tương đồng ${pct}%, Trạng thái: ${data.livenessStatus}`, 'success');
         } else if (data.isMatch && !data.isLive) {
           livenessBadge.className = 'result-badge badge-fake';
           livenessBadge.textContent = 'Giả mạo (Spoof)';
           verificationConclusion.textContent = `CẢNH BÁO: Giả mạo (${data.livenessStatus})`;
           verificationConclusion.style.color = 'var(--accent-rose)';
-          logEvent('FACE_VERIFY', `CẢNH BÁO GIẢ MẠO: Điểm trùng ${pct}% nhưng không vượt qua liveness!`, 'warning');
+          logEvent('FACE_VERIFY', `CẢNH BÁO GIẢ MẠO: Điểm trùng ${pct}% nhưng không vượt qua kiểm tra người thật!`, 'warning');
         } else {
           livenessBadge.className = 'result-badge badge-fake';
           livenessBadge.textContent = 'Không khớp';
@@ -428,8 +389,8 @@ document.addEventListener('DOMContentLoaded', () => {
         livenessBadge.textContent = 'Lỗi nhận diện';
         verificationConclusion.textContent = data.message || 'Lỗi xác thực';
         verificationConclusion.style.color = 'var(--accent-rose)';
-        logEvent('FACE_VERIFY', `Lỗi (${res.status}): ${data.message}`, 'error');
-        alert('Lỗi xác thực: ' + (data.message || 'Không thể xác thực khuôn mặt.'));
+        logEvent('FACE_VERIFY', `Lỗi thiết bị (${res.status}): ${data.message}`, 'error');
+        alert('Lỗi xác thực: ' + (data.message || 'Không thể xác thực khuôn mặt từ thiết bị.'));
       }
 
     } catch (err) {
@@ -451,5 +412,4 @@ document.addEventListener('DOMContentLoaded', () => {
   logEvent('SYSTEM', 'Khởi chạy Web Dashboard. Đang kết nối dịch vụ ngầm...');
   initSignalR();
   fetchDeviceStatus();
-  startBrowserCamera();
 });
